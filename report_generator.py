@@ -1,154 +1,120 @@
-from __future__ import annotations
-
-import io
-from datetime import datetime
-from typing import Optional, Dict, Any
-
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
-from reportlab.lib.pagesizes import A4
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import inch
 from reportlab.lib import colors
+import io
 
 
 def build_ecg_report_pdf(
-    *,
-    output_path: str,
-    hospital_name: str,
-    report_title: str,
-    patient_name: str,
-    patient_age: str,
-    patient_sex: str,
-    patient_id: str,
-    sample_test_id: str,
-    record_name: str,
-    result: Dict[str, Any],
-    ecg_plot_png_bytes: bytes,
-    hospital_address: str = "",
-    hospital_phone: str = "",
-    hospital_email: str = "",
-    logo_png_bytes: Optional[bytes] = None,
-) -> None:
+    output_path,
+    hospital_name,
+    report_title,
+    patient_name,
+    patient_age,
+    patient_sex,
+    patient_id,
+    sample_test_id,
+    record_name,
+    result,
+    ecg_plot_png_bytes,
+    hospital_address="",
+    hospital_phone="",
+    hospital_email="",
+    logo_png_bytes=None,
+):
+
     styles = getSampleStyleSheet()
-    doc = SimpleDocTemplate(
-        output_path,
-        pagesize=A4,
-        leftMargin=36,
-        rightMargin=36,
-        topMargin=30,
-        bottomMargin=30,
-    )
+    story = []
 
-    elements = []
+    # ---------- TITLE ----------
+    story.append(Paragraph("<b>NeuroCardiac Digital Twin Report</b>", styles["Title"]))
+    story.append(Spacer(1, 20))
 
-    # Header
-    header_left = []
-    header_left.append(Paragraph(f"<b>{report_title}</b>", styles["Title"]))
-    header_left.append(Paragraph(f"<b>{hospital_name}</b>", styles["Normal"]))
+    # ---------- PATIENT DETAILS TABLE ----------
+    story.append(Paragraph("<b>Patient Details</b>", styles["Heading2"]))
 
-    contact_line = " | ".join([x for x in [hospital_address, hospital_phone, hospital_email] if x]).strip()
-    if contact_line:
-        header_left.append(Paragraph(contact_line, styles["Normal"]))
-
-    header_left.append(Paragraph(f"Report Date/Time: {datetime.now().strftime('%Y-%m-%d %H:%M')}", styles["Normal"]))
-
-    if logo_png_bytes:
-        logo = Image(io.BytesIO(logo_png_bytes), width=1.0 * inch, height=1.0 * inch)
-        header_tbl = Table([[header_left, logo]], colWidths=[5.6 * inch, 1.1 * inch])
-    else:
-        header_tbl = Table([[header_left]], colWidths=[6.7 * inch])
-
-    header_tbl.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-    ]))
-    elements.append(header_tbl)
-    elements.append(Spacer(1, 0.15 * inch))
-
-    # Patient details
-    patient_tbl = Table(
-        [
-            ["Patient Name", patient_name, "Patient ID", patient_id],
-            ["Age", patient_age, "Sex", patient_sex],
-            ["Sample/Test ID", sample_test_id, "ECG Record", record_name],
-        ],
-        colWidths=[1.35 * inch, 2.0 * inch, 1.35 * inch, 2.0 * inch],
-    )
-    patient_tbl.setStyle(TableStyle([
-        ("BOX", (0, 0), (-1, -1), 1, colors.black),
-        ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.grey),
-        ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
-        ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
-        ("FONTSIZE", (0, 0), (-1, -1), 9),
-        ("LEFTPADDING", (0, 0), (-1, -1), 6),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-        ("TOPPADDING", (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-    ]))
-    elements.append(patient_tbl)
-    elements.append(Spacer(1, 0.2 * inch))
-
-    # ECG image
-    elements.append(Paragraph("<b>ECG Waveform (Single Lead)</b>", styles["Heading3"]))
-    elements.append(Spacer(1, 0.05 * inch))
-    elements.append(Image(io.BytesIO(ecg_plot_png_bytes), width=6.7 * inch, height=2.2 * inch))
-    elements.append(Spacer(1, 0.2 * inch))
-
-    # Metrics table
-    def g(key: str, default: str = "") -> str:
-        v = result.get(key, default)
-        if v is None:
-            return ""
-        if isinstance(v, float):
-            return f"{v:.4f}"  # Round float nicely
-        return str(v)
-
-    metrics_rows = [
-        ["Metric", "Value"],
-        ["Average HR (BPM)", g("Average_HR")],
-        ["RMSSD", g("RMSSD")],
-        ["SDNN", g("SDNN")],
-        ["Alpha Power", g("Alpha_Power")],
-        ["Beta Power", g("Beta_Power")],
-        ["Stress Index", g("Stress_Index")],
-        ["Coupling Index", g("Coupling_Index")],
-        ["Risk Score", g("Risk_Score")],
-        ["Status", g("Status")],
+    patient_data = [
+        ["Patient Name", patient_name],
+        ["Patient ID", patient_id],
+        ["Age", patient_age],
+        ["Sex", patient_sex],
+        ["Sample/Test ID", sample_test_id],
+        ["Record Name", record_name],
     ]
-    metrics_tbl = Table(metrics_rows, colWidths=[3.0 * inch, 3.7 * inch])
-    metrics_tbl.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eaeaea")),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("BOX", (0, 0), (-1, -1), 1, colors.black),
-        ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.grey),
-        ("FONTSIZE", (0, 0), (-1, -1), 9),
-        ("LEFTPADDING", (0, 0), (-1, -1), 6),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-        ("TOPPADDING", (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+
+    patient_table = Table(patient_data, colWidths=[200, 300])
+
+    patient_table.setStyle(TableStyle([
+        ("GRID", (0,0), (-1,-1), 1, colors.grey),
+        ("BACKGROUND", (0,0), (0,-1), colors.lightgrey),
     ]))
 
-    elements.append(Paragraph("<b>Results</b>", styles["Heading3"]))
-    elements.append(metrics_tbl)
-    elements.append(Spacer(1, 0.2 * inch))
+    story.append(patient_table)
+    story.append(Spacer(1, 25))
 
-    # Summary
-    status = g("Status", "Unknown")
-    risk = g("Risk_Score", "NA")
-    summary_text = (
-        f"Automated ECG analysis completed for record <b>{record_name}</b>. "
-        f"Computed risk score is <b>{risk}</b> with status <b>{status}</b>. "
-        f"Please correlate clinically."
-    )
-    elements.append(Paragraph("<b>Summary</b>", styles["Heading3"]))
-    elements.append(Paragraph(summary_text, styles["Normal"]))
-    elements.append(Spacer(1, 0.25 * inch))
+    # ---------- ECG GRAPH ----------
+    story.append(Paragraph("<b>ECG Signal (Heart Activity)</b>", styles["Heading2"]))
 
-    # Disclaimer
-    elements.append(Paragraph(
-        "<font size=8 color='grey'>Disclaimer: Computer-generated report for informational use only. "
-        "Not a final medical diagnosis.</font>",
-        styles["Normal"]
-    ))
+    ecg_img = Image(io.BytesIO(ecg_plot_png_bytes))
+    ecg_img.drawHeight = 2.5 * inch
+    ecg_img.drawWidth = 6 * inch
 
-    doc.build(elements)
+    story.append(ecg_img)
+    story.append(Spacer(1, 25))
+
+    # ---------- EEG GRAPH ----------
+    if "EEG_Plot" in result:
+
+        story.append(Paragraph("<b>EEG Signal (Brain Activity)</b>", styles["Heading2"]))
+
+        eeg_img = Image(io.BytesIO(result["EEG_Plot"]))
+        eeg_img.drawHeight = 2.5 * inch
+        eeg_img.drawWidth = 6 * inch
+
+        story.append(eeg_img)
+        story.append(Spacer(1, 25))
+
+    # ---------- NEUROCARDIAC VALUES TABLE ----------
+    story.append(Paragraph("<b>NeuroCardiac Digital Twin Values</b>", styles["Heading2"]))
+
+    values_data = [
+        ["ECG Heart Rate (BPM)", result.get("Average_HR", "N/A")],
+        ["EEG Alpha Power", result.get("Alpha_Power", "N/A")],
+        ["EEG Beta Power", result.get("Beta_Power", "N/A")],
+        ["Stress Index", result.get("Stress_Index", "N/A")],
+        ["Coupling Index", result.get("Coupling_Index", "N/A")],
+        ["Risk Score", result.get("Risk_Score", "N/A")],
+        ["AI Status", result.get("Status", "N/A")],
+    ]
+
+    values_table = Table(values_data, colWidths=[250, 250])
+
+    values_table.setStyle(TableStyle([
+        ("GRID", (0,0), (-1,-1), 1, colors.grey),
+        ("BACKGROUND", (0,0), (0,-1), colors.lightgrey),
+    ]))
+
+    story.append(values_table)
+    story.append(Spacer(1, 25))
+
+    # ---------- SHORT SUMMARY ----------
+    story.append(Paragraph("<b>Health Summary</b>", styles["Heading2"]))
+
+    summary_text = f"""
+    ECG and EEG signals were analyzed using the NeuroCardiac Digital Twin system.
+
+    Heart Rate: {result.get("Average_HR","N/A")} BPM  
+    Alpha Power: {result.get("Alpha_Power","N/A")}  
+    Beta Power: {result.get("Beta_Power","N/A")}  
+
+    Coupling Index: {result.get("Coupling_Index","N/A")}  
+    Risk Score: {result.get("Risk_Score","N/A")}  
+    Status: {result.get("Status","N/A")}
+    """
+
+    story.append(Paragraph(summary_text, styles["Normal"]))
+
+    # ---------- BUILD PDF ----------
+    doc = SimpleDocTemplate(output_path, pagesize=A4)
+    doc.build(story)
